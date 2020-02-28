@@ -34,17 +34,21 @@ func main() {
 	lines := strings.Split(string(data), "\n")
 	for _, line := range lines {
 		parts := strings.Split(line, "\t")
-		if 3 != len(parts) {
+		if 3 > len(parts) {
 			continue
 		}
+
 		country, province, city := parts[0], parts[1], parts[2]
-		province = strings.ReplaceAll(province, "省", "")
-		city = strings.ReplaceAll(city, "市", "")
-		lat, lng := query(country, province, city)
+		area := ""
+		if 4 == len(parts) {
+			area = parts[3]
+		}
+		lat, lng := query(country, province, city, area)
 		resultLine := map[string]interface{}{
 			"country":  country,
 			"province": province,
 			"city":     city,
+			"area":     area,
 			"lat":      lat,
 			"lng":      lng,
 		}
@@ -63,8 +67,8 @@ func main() {
 	log.Println("completed")
 }
 
-func query(country, province, city string) (latitude, longitude string) {
-	api := "http://api.map.baidu.com/geocoding/v3/?address=" + province + city + "&output=json&ak=" + baiduAK
+func query(country, province, city, area string) (latitude, longitude string) {
+	api := "http://api.map.baidu.com/geocoding/v3/?address=" + province + city + area + "&output=json&ak=" + baiduAK
 	response, data, errors := gorequest.New().Get(api).EndBytes()
 	if nil != errors {
 		log.Printf("city [%s] result failed [%+v]", city, errors)
