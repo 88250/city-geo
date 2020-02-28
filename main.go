@@ -22,6 +22,8 @@ import (
 const baiduAK = "XSVaW6UooxiXEFlaBOGDXFmIARffS5Oo"
 
 func main() {
+	generateCity()
+
 	data, err := ioutil.ReadFile("city.txt")
 	if nil != err {
 		log.Fatal(err)
@@ -87,5 +89,73 @@ func query(country, province, city string) (latitude, longitude string) {
 	lat := location["lat"].(float64)
 	lng := location["lng"].(float64)
 	latitude, longitude = fmt.Sprint(lat), fmt.Sprint(lng)
+	return
+}
+
+func generateCity() {
+	provincesData, err := ioutil.ReadFile("provinces.json")
+	if nil != err {
+		log.Fatal(err)
+	}
+	citiesData, err := ioutil.ReadFile("cities.json")
+	if nil != err {
+		log.Fatal(err)
+	}
+	areasData, err := ioutil.ReadFile("areas.json")
+	if nil != err {
+		log.Fatal(err)
+	}
+
+	var provinces []map[string]interface{}
+	if err := json.Unmarshal(provincesData, &provinces); nil != err {
+		log.Fatal(err)
+	}
+
+	var cities = []map[string]interface{}{}
+	if err := json.Unmarshal(citiesData, &cities); nil != err {
+		log.Fatal(err)
+	}
+
+	areas := []map[string]interface{}{}
+	if err := json.Unmarshal(areasData, &areas); nil != err {
+		log.Fatal(err)
+	}
+
+	var lines string
+	for _, province := range provinces {
+		provinceName := province["name"].(string)
+		provinceCode := province["code"].(string)
+		selectCities := getCities(provinceCode, cities)
+		for _, city := range selectCities {
+			cityName := city["name"].(string)
+			cityCode := city["code"].(string)
+			lines += "中国\t" + provinceName + "\t" + cityName + "\n"
+			selectAreas := getAreas(cityCode, areas)
+			for _, area := range selectAreas {
+				areaName := area["name"].(string)
+
+				lines += "中国\t" + provinceName + "\t" + cityName + "\t" + areaName + "\n"
+			}
+		}
+	}
+
+	ioutil.WriteFile("city.txt", []byte(lines), 0644)
+}
+
+func getCities(provinceCode string, cities []map[string]interface{}) (ret []map[string]interface{}) {
+	for _, city := range cities {
+		if city["provinceCode"].(string) == provinceCode {
+			ret = append(ret, city)
+		}
+	}
+	return
+}
+
+func getAreas(cityCode string, areas []map[string]interface{}) (ret []map[string]interface{}) {
+	for _, area := range areas {
+		if area["cityCode"].(string) == cityCode {
+			ret = append(ret, area)
+		}
+	}
 	return
 }
