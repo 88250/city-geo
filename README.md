@@ -2,6 +2,10 @@
 
 该仓库整理了中国城市县区的经纬度数据。
 
+欢迎关注 B3log 开源社区微信公众号 `B3log开源`：
+
+![image-d3c00d78](https://user-images.githubusercontent.com/873584/71566370-0d312c00-2af2-11ea-8ea1-0d45d6f0db20.png)
+
 ## 用法
 
 [data.json](https://github.com/88250/city-geo/blob/master/data.json) 是已经整理好的数据，可直接使用。
