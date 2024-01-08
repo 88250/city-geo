@@ -6,9 +6,9 @@ City Geo 仓库整理了中国城市县区的经纬度数据。
 
 [data.json](https://github.com/MaurUppi/city-geo/blob/master/data.json) 是已经整理好的数据，可直接使用。
 
-- **2024-01-08**  按照 [城市数据来源](https://github.com/modood/Administrative-divisions-of-China)： **2023年统计用区划代码和城乡划分代码（截止时间：2023-06-30，发布时间：2023-09-11）**
+- 按照 [城市数据来源](https://github.com/modood/Administrative-divisions-of-China)： **2023年统计用区划代码和城乡划分代码（截止时间：2023-06-30，发布时间：2023-09-11）**
 - 更新后的“省份、城市、区县” 三级 的 最新地理坐标数据
-- 重新刷新数据
+- **2024-01-08**  重新刷新数据
 
 <details>
       <summary>Click to expand for details</summary>
