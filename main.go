@@ -7,24 +7,35 @@
 //         http://license.coscl.org.cn/MulanPSL2
 // THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
+// 2024-01-08 revised func main() and query(). 
 
 package main
 
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/parnurzeal/gorequest"
-	"io/ioutil"
 	"log"
+	"os"
 	"strings"
+	"time"
+
+	"github.com/parnurzeal/gorequest"
 )
 
 const baiduAK = "XSVaW6UooxiXEFlaBOGDXFmIARffS5Oo"
 
 func main() {
+	logFile, err := os.OpenFile("query.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	if err != nil {
+		log.Fatal("Failed to open log file: ", err)
+	}
+	defer logFile.Close()
+
+	log.SetOutput(logFile)
+
 	generateCity()
 
-	data, err := ioutil.ReadFile("city.txt")
+	data, err := os.ReadFile("city.txt")
 	if nil != err {
 		log.Fatal(err)
 	}
@@ -34,13 +45,13 @@ func main() {
 	lines := strings.Split(string(data), "\n")
 	for _, line := range lines {
 		parts := strings.Split(line, "\t")
-		if 3 > len(parts) {
+		if len(parts) < 3 {
 			continue
 		}
 
 		country, province, city := parts[0], parts[1], parts[2]
 		area := ""
-		if 4 == len(parts) {
+		if len(parts) == 4 {
 			area = parts[3]
 		}
 		lat, lng := query(country, province, city, area)
@@ -54,6 +65,7 @@ func main() {
 		}
 		output = append(output, resultLine)
 		log.Printf("query result %+v", resultLine)
+		//fmt.Printf("query result %+v\n", resultLine)
 	}
 
 	resultData, err := json.MarshalIndent(output, "", "  ")
@@ -61,39 +73,87 @@ func main() {
 		log.Fatal(err)
 	}
 
-	if err := ioutil.WriteFile("data.json", resultData, 0644); nil != err {
+	if err := os.WriteFile("data.json", resultData, 0644); nil != err {
 		log.Fatal(err)
 	}
-	log.Println("completed")
+
+	log.Println("Program completed successfully")
+
 }
 
 func query(country, province, city, area string) (latitude, longitude string) {
-	api := "http://api.map.baidu.com/geocoding/v3/?address=" + province + city + area + "&output=json&ak=" + baiduAK
-	response, data, errors := gorequest.New().Get(api).EndBytes()
-	if nil != errors {
-		log.Printf("city [%s] result failed [%+v]", city, errors)
-	}
-	if 200 != response.StatusCode {
-		log.Printf("city [%s] result response [%+v]", city, response)
-	}
+	maxRetries := 3
+	for retries := 0; retries < maxRetries; retries++ {
+		api := "http://api.map.baidu.com/geocoding/v3/?address=" + province + city + area + "&ret_coordtype=gcj02ll&output=json&ak=" + baiduAK
+		response, data, errors := gorequest.New().Get(api).EndBytes()
 
-	responseData := map[string]interface{}{}
-	if err := json.Unmarshal(data, &responseData); nil != err {
-		log.Printf("city [%s] unmarshal failed [%+v]", city, responseData)
+		// 检查是否有错误
+		if errors != nil {
+			fmt.Printf("Attempt %d: Request error for city [%s]: %+v\n", retries+1, city, errors)
+			log.Printf("Attempt %d: Request error for city [%s]: %+v", retries+1, city, errors)
+			continue
+		}
+
+		// 检查是否收到响应
+		if response == nil {
+			log.Printf("Attempt %d: No response received for city [%s]", retries+1, city)
+			continue
+		}
+
+		//if errors == nil && response != nil && response.StatusCode == 200 {
+		// 检查响应状态码
+		if response.StatusCode == 302 {
+			log.Fatalf("Received status code 302 for city [%s], terminating program.", city)
+		} else if response.StatusCode != 200 {
+			log.Printf("Attempt %d: Unexpected status code for city [%s]: %d", retries+1, city, response.StatusCode)
+			time.Sleep(1 * time.Second)
+			continue
+		}
+
+		// 解析响应数据
+		responseData := map[string]interface{}{}
+		if err := json.Unmarshal(data, &responseData); err != nil {
+			log.Printf("Attempt %d: city [%s] unmarshal failed [%+v]", retries+1, city, err)
+			time.Sleep(1 * time.Second)
+			continue
+		}
+
+		status, ok := responseData["status"].(float64)
+		if !ok || status != 0.0 {
+			log.Printf("Attempt %d: city [%s] result response data [%+v]", retries+1, city, responseData)
+			continue
+		}
+
+		result, ok := responseData["result"].(map[string]interface{})
+		if !ok {
+			log.Printf("Attempt %d: city [%s] result type assertion failed", retries+1, city)
+			continue
+		}
+
+		location, ok := result["location"].(map[string]interface{})
+		if !ok {
+			log.Printf("Attempt %d: city [%s] location type assertion failed", retries+1, city)
+			continue
+		}
+
+		lat, ok := location["lat"].(float64)
+		if !ok {
+			log.Printf("Attempt %d: city [%s] latitude type assertion failed", retries+1, city)
+			continue
+		}
+
+		lng, ok := location["lng"].(float64)
+		if !ok {
+			log.Printf("Attempt %d: city [%s] longitude type assertion failed", retries+1, city)
+			continue
+		}
+
+		latitude, longitude = fmt.Sprint(lat), fmt.Sprint(lng)
 		return
 	}
 
-	if status := responseData["status"]; 0.0 != status {
-		log.Printf("city [%s] result response data [%+v]", city, responseData)
-		return
-	}
-
-	result := responseData["result"].(map[string]interface{})
-	location := result["location"].(map[string]interface{})
-	lat := location["lat"].(float64)
-	lng := location["lng"].(float64)
-	latitude, longitude = fmt.Sprint(lat), fmt.Sprint(lng)
-	return
+	log.Printf("Failed to query after %d attempts for city [%s]", maxRetries, city)
+	return "", ""
 }
 
 func generateCity() {
